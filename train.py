@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-
+import re
 from tensorboardX import SummaryWriter
 import numpy as np
 import json
@@ -45,7 +45,7 @@ class Solver(object):
     @staticmethod
     def sum_loss(pred_score, gt_labels, weight=None):
         n_batch, n_class, n_frame = pred_score.shape
-        log_p = torch.log_softmax(pred_score, dim=1).reshape(-1, n_class)
+        log_p = torch.nn.functional.softmax(pred_score, dim=1).reshape(-1, n_class)
         gt_labels = gt_labels.reshape(-1)
         criterion = torch.nn.NLLLoss(weight)
         loss = criterion(log_p, gt_labels)
@@ -108,8 +108,8 @@ class Solver(object):
                 if self.config.gpu:
                     feature = feature.cuda()
                 pred_score = self.model(feature.unsqueeze(0)).squeeze(0)
-                pred_score = torch.softmax(pred_score, dim=0)[1]
-                video_info = data_file['video_'+str(idx)]
+                pred_score = torch.nn.functional.softmax(pred_score, dim=0)[1]
+                video_info = data_file['video_'+re.findall(r'[(](.*?)[)]', str(idx))[0]]
                 pred_score, pred_selected, pred_summary = eval.select_keyshots(video_info, pred_score)
                 true_summary_arr = video_info['user_summary'][()]
                 eval_res = [eval.eval_metrics(pred_summary, true_summary) for true_summary in true_summary_arr]
@@ -118,15 +118,16 @@ class Solver(object):
                 eval_arr.append(eval_res)
                 table.add_row([idx] + eval_res)
 
-                out_dict[idx] = {
-                    'pred_score': pred_score, 
-                    'pred_selected': pred_selected, 'pred_summary': pred_summary
+                out_dict[re.findall(r'[(](.*?)[)]', str(idx))[0]] = {
+                    'pred_score': pred_score,
+                    'pred_selected':pred_selected,
+                    'pred_summary':pred_summary
                     }
         
         score_save_path = self.config.score_dir + '/epoch-{}.json'.format(epoch_i)
         with open(score_save_path, 'w') as f:
             tqdm.write('Save score at {}'.format(str(score_save_path)))
-            json.dump(out_dict, f)
+            json.dump(out_dict,f)
         eval_mean = np.mean(eval_arr, axis=0).tolist()
         table.add_row(['mean']+eval_mean)
         tqdm.write(str(table))

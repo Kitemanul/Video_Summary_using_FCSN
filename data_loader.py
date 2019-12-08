@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
-
+import re
 import h5py
 
 
@@ -13,8 +13,7 @@ class VideoData(object):
         return len(self.data_file)
         
     def __getitem__(self, index):
-        index += 1
-        video = self.data_file['video_'+str(index)]
+        video = self.data_file['video_'+re.findall(r'[(](.*?)[)]', str(index))[0]]
         feature = torch.tensor(video['feature'][()]).t()
         label = torch.tensor(video['label'][()], dtype=torch.long)
         return feature, label, index
@@ -22,7 +21,9 @@ class VideoData(object):
 
 def get_loader(path, batch_size=5):
     dataset = VideoData(path)
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [len(dataset) - len(dataset) // 5, len(dataset) // 5])
+    train_dataset, test_dataset = torch.utils.data.dataset.random_split(dataset, [len(dataset) - len(dataset) // 5, len(dataset) // 5])
+    train_dataset.indices.add_(1)
+    test_dataset.indices.add_(1)
     train_loader = DataLoader(train_dataset, batch_size=batch_size)
     return train_loader, test_dataset
 

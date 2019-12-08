@@ -6,3 +6,6 @@ save_dir
 score_dir
 Results
 *.pyc
+dataset
+result
+*.json
